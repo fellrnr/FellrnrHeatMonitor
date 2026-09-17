@@ -54,7 +54,8 @@ public sealed class FellrnrHeatCalculator
 
             var totalSodiumMmol = sodiumMmolLiter * sweatRateLitersHour;
             var totalSodiumGrams = totalSodiumMmol / 44.0;
-            SodiumMessage = $" {Math.Round(sweatRateLitersHour, 1)} l/hr, Na {Math.Round(totalSodiumGrams, 1)}g/hr";
+            //SodiumMessage = $" {Math.Round(sweatRateLitersHour, 1)} l/hr, Na {Math.Round(totalSodiumGrams, 1)}g/hr";
+            SodiumMessage = $" {Math.Round(sweatRateLitersHour, 1)} l/hr";
         }
         else
         {
@@ -79,7 +80,7 @@ public sealed class FellrnrHeatCalculator
                 msg = $"{Math.Round(terminalTempRiseTime / 60.0, 1)} hour";
             }
 
-            ResultMessage = $"Too Hot, Terminal in ~{msg}";
+            ResultMessage = $"Fail in ~{msg}";
             FeelsLikeTemp = 99.0;
             TempColor = "#FF0000";
             return;
@@ -161,12 +162,16 @@ public sealed class FellrnrHeatCalculator
 
     public double CalculateSkinTemp(double airTemp, double relHumidity, double airVelocity, bool forRunning = true)
     {
-        if (airTemp < 29)
-        {
-            return CalculateSkinTempMehnert(airTemp, relHumidity, airVelocity);
-        }
+        //update skin temp calculation to use exponential decay function based on air temperature
+        double skinTemp = 37.0 - 5 * Math.Exp(-(airTemp - 25.0) / 7.0);
 
-        return CalculateSkinTempNeilson(airTemp);
+        return skinTemp;
+        //if (airTemp < 29)
+        //{
+        //    return CalculateSkinTempMehnert(airTemp, relHumidity, airVelocity);
+        //}
+
+        //return CalculateSkinTempNeilson(airTemp);
     }
 
     public double CalculateSkinTempMehnert(double airTemp, double relHumidity, double airVelocity)

@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using FellrnrHeatMonitor.Models;
+using System.ComponentModel;
 
 namespace FellrnrHeatMonitor.Controls;
 
@@ -12,11 +13,15 @@ internal sealed class TemperatureGraphControl : Control
     public TemperatureGraphControl()
     {
         DoubleBuffered = true;
-        BackColor = Color.White;
-        ForeColor = Color.Black;
+        //dark
+        //BackColor = Color.White;
+        //ForeColor = Color.Black;
+        BackColor = Color.Black;
+        ForeColor = Color.White;
         History = TimeSpan.FromMinutes(60);
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public TimeSpan History { get; set; }
 
     public void SetSeries(IEnumerable<GraphSeries> series)
@@ -67,6 +72,7 @@ internal sealed class TemperatureGraphControl : Control
     {
         g.DrawRectangle(axisPen, plot);
 
+        // Primary Y-axis (left, temperature)
         for (var i = 0; i <= 5; i++)
         {
             var y = plot.Bottom - (float)(i / 5.0 * plot.Height);
@@ -75,6 +81,15 @@ internal sealed class TemperatureGraphControl : Control
             g.DrawString($"{value:F0} C", Font, textBrush, 6, y - 8);
         }
 
+        // Secondary Y-axis (right, humidity 0-100%)
+        for (var i = 0; i <= 5; i++)
+        {
+            var y = plot.Bottom - (float)(i / 5.0 * plot.Height);
+            var humidity = i * 20;
+            g.DrawString($"{humidity}%", Font, textBrush, plot.Right + 8, y - 8);
+        }
+
+        // X-axis (time)
         for (var i = 0; i <= 6; i++)
         {
             var x = plot.Left + (float)(i / 6.0 * plot.Width);
@@ -95,7 +110,9 @@ internal sealed class TemperatureGraphControl : Control
             var points = series.Points
                 .Where(p => p.Time >= cutoff)
                 .OrderBy(p => p.Time)
-                .Select(p => Project(p, plot, minY, maxY, cutoff, historySeconds))
+                .Select(p => series.UseSecondaryAxis 
+                    ? ProjectHumidity(p, plot, cutoff, historySeconds) 
+                    : Project(p, plot, minY, maxY, cutoff, historySeconds))
                 .ToArray();
 
             if (points.Length == 0)
@@ -103,9 +120,9 @@ internal sealed class TemperatureGraphControl : Control
                 continue;
             }
 
-            using var pen = new Pen(series.Color, 2.0f)
+            using var pen = new Pen(series.Color, 4.0f)
             {
-                DashStyle = series.Dashed ? DashStyle.Dash : DashStyle.Solid
+                DashStyle = series.Dashed
             };
 
             if (points.Length == 1)
@@ -129,6 +146,16 @@ internal sealed class TemperatureGraphControl : Control
         return new PointF(x, y);
     }
 
+    private static PointF ProjectHumidity(GraphPoint point, Rectangle plot, DateTimeOffset cutoff, double historySeconds)
+    {
+        var xRatio = Math.Clamp((point.Time - cutoff).TotalSeconds / historySeconds, 0.0, 1.0);
+        var humidity = point.HumidityPercent ?? 0;
+        var yRatio = Math.Clamp(humidity / 100.0, 0.0, 1.0);
+        var x = plot.Left + (float)(xRatio * plot.Width);
+        var y = plot.Bottom - (float)(yRatio * plot.Height);
+        return new PointF(x, y);
+    }
+
     private void DrawLegend(Graphics g, int x, int y)
     {
         var lineHeight = 18;
@@ -139,9 +166,9 @@ internal sealed class TemperatureGraphControl : Control
 
         foreach (var series in _series)
         {
-            using var pen = new Pen(series.Color, 2.0f)
+            using var pen = new Pen(series.Color, 4.0f)
             {
-                DashStyle = series.Dashed ? DashStyle.Dash : DashStyle.Solid
+                DashStyle = series.Dashed
             };
             g.DrawLine(pen, x, y + 8, x + 28, y + 8);
             g.DrawString(series.Title, Font, textBrush, x + 34, y);

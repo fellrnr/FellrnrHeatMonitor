@@ -12,6 +12,41 @@ internal static class ColorUtilities
         Color.FromArgb(52, 152, 219)
     };
 
+    public static Color GetTemperatureColor(double temperature)
+    {
+        Color green = Color.Green;
+        Color orange = Color.Orange;
+        Color red = Color.Red;
+        Color purple = Color.Purple;
+
+        if (temperature <= 30)
+            return green;
+
+        if (temperature <= 40)
+            return Lerp(green, orange, (temperature - 30) / 10.0);
+
+        if (temperature <= 45)
+            return Lerp(orange, red, (temperature - 40) / 5.0);
+
+        if (temperature <= 50)
+            return Lerp(red, purple, (temperature - 45) / 5.0);
+
+        return purple;
+    }
+
+    private static Color Lerp(Color a, Color b, double t)
+    {
+        t = Math.Clamp(t, 0.0, 1.0);
+
+        int r = (int)Math.Round(a.R + (b.R - a.R) * t);
+        int g = (int)Math.Round(a.G + (b.G - a.G) * t);
+        int bl = (int)Math.Round(a.B + (b.B - a.B) * t);
+
+        return Color.FromArgb(r, g, bl);
+    }
+
+
+
     public static Color FromHtmlOrDefault(string? html, Color fallback)
     {
         if (string.IsNullOrWhiteSpace(html))

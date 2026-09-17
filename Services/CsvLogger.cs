@@ -16,7 +16,7 @@ internal sealed class CsvLogger : IDisposable
             Close();
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
             _writer = new StreamWriter(path, append: false, Encoding.UTF8);
-            _writer.WriteLine("Timestamp,SensorIndex,SensorName,Source,BluetoothMac,UsbChannel,BluetoothTemperatureC,BluetoothDelta60C,BluetoothDelta120C,BluetoothHumidityPercent,BluetoothDewPointC,BluetoothHeatStress,UsbTemperatureC,UsbDelta60C,UsbDelta120C,UsbHeatStressUsingBluetoothHumidity,BatteryPercent,Rssi");
+            _writer.WriteLine("Timestamp,SensorIndex,SensorName,Source,BluetoothMac,UsbChannel,BluetoothTemperatureC,BluetoothDelta60C,BluetoothHumidityPercent,BluetoothDewPointC,BluetoothHeatStress,UsbTemperatureC,UsbDelta60C,UsbHeatStressUsingBluetoothHumidity,BatteryPercent,Rssi");
         }
     }
 
@@ -27,10 +27,8 @@ internal sealed class CsvLogger : IDisposable
         BluetoothReading? bluetooth,
         UsbReading? usb,
         string bluetoothDelta60,
-        string bluetoothDelta120,
         HeatStressResult? bluetoothHeatStress,
         string usbDelta60,
-        string usbDelta120,
         HeatStressResult? usbHeatStress)
     {
         lock (_sync)
@@ -51,13 +49,13 @@ internal sealed class CsvLogger : IDisposable
                 usb?.Channel.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 FormatNullable(bluetooth?.TemperatureC),
                 bluetoothDelta60,
-                bluetoothDelta120,
+                //bluetoothDelta120,
                 bluetooth?.HumidityPercent.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 FormatNullable(bluetooth?.DewPointC),
                 bluetoothHeatStress?.Message ?? string.Empty,
                 FormatNullable(usb?.TemperatureC),
                 usbDelta60,
-                usbDelta120,
+                //usbDelta120,
                 usbHeatStress?.Message ?? string.Empty,
                 bluetooth?.BatteryPercent?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 bluetooth?.Rssi.ToString(CultureInfo.InvariantCulture) ?? string.Empty

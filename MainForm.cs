@@ -20,17 +20,19 @@ internal sealed class MainForm : Form
 
     private readonly FlowLayoutPanel _cardsPanel = new();
     private readonly TemperatureGraphControl _graph = new();
+    private readonly TemperatureBinsPanel _binsPanel = new();
     private readonly Label _statusLabel = new();
     private readonly Label _modeLabel = new();
     private readonly Button _startButton = new();
     private readonly Button _stopButton = new();
     private readonly Button _clearButton = new();
+    private readonly Button _resetBinsButton = new();
     private readonly Button _configButton = new();
 
     private readonly Dictionary<int, SensorPairCard> _cardsByIndex = new();
     private readonly Dictionary<string, GraphSeries> _seriesByKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _lastGraphPointByKey = new(StringComparer.OrdinalIgnoreCase);
-
+    private readonly SensorPairCard AverageCard = new SensorPairCard();
     private BluetoothReading?[] _lastBluetooth = new BluetoothReading?[4];
     private UsbReading?[] _lastUsb = new UsbReading?[4];
     private TemperatureDeltaCalculator[] _bluetoothDeltas = CreateDeltaCalculators();
@@ -42,7 +44,9 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "FellrnrHeatMonitor";
+        Text = "Fellrnr Heat Monitor";
+        InitializeComponent();
+        //Icon = Properties.Resources.HeatMonitorIcon;
         //Width = 1540;
         //Height = 900;
         //MinimumSize = new Size(1050, 650);
@@ -89,10 +93,11 @@ internal sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3
+            RowCount = 4
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 285));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 335)); //285
+        //root.RowStyles.Add(new RowStyle(SizeType.Absolute, 280));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var toolbar = new FlowLayoutPanel
@@ -106,6 +111,7 @@ internal sealed class MainForm : Form
         ConfigureButton(_startButton, "Start", (_, _) => StartMonitoring());
         ConfigureButton(_stopButton, "Stop", (_, _) => StopMonitoring());
         ConfigureButton(_clearButton, "Clear graph", (_, _) => ClearGraphData());
+        ConfigureButton(_resetBinsButton, "Reset bins", (_, _) => ResetTemperatureBins());
         ConfigureButton(_configButton, "Configuration", (_, _) => OpenConfigurationDialog());
 
         _modeLabel.AutoSize = false;
@@ -124,6 +130,7 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(_startButton);
         toolbar.Controls.Add(_stopButton);
         toolbar.Controls.Add(_clearButton);
+        toolbar.Controls.Add(_resetBinsButton);
         toolbar.Controls.Add(_configButton);
         toolbar.Controls.Add(_modeLabel);
         toolbar.Controls.Add(_statusLabel);
@@ -135,11 +142,15 @@ internal sealed class MainForm : Form
         _cardsPanel.Padding = new Padding(8);
         _cardsPanel.BackColor = SystemColors.Control;
 
+        //_binsPanel.Dock = DockStyle.Fill;
+        //_binsPanel.Margin = new Padding(8);
+
         _graph.Dock = DockStyle.Fill;
         _graph.Margin = new Padding(8);
 
         root.Controls.Add(toolbar, 0, 0);
         root.Controls.Add(_cardsPanel, 0, 1);
+        //root.Controls.Add(_binsPanel, 0, 2);
         root.Controls.Add(_graph, 0, 2);
         Controls.Add(root);
     }
@@ -189,9 +200,19 @@ internal sealed class MainForm : Form
             _cardsByIndex[pair.Index] = card;
             _cardsPanel.Controls.Add(card);
 
-            _seriesByKey[SeriesKey(pair.Index, "USB")] = new GraphSeries(SeriesKey(pair.Index, "USB"), $"{pair.Name} USB", color, dashed: false);
-            _seriesByKey[SeriesKey(pair.Index, "BT")] = new GraphSeries(SeriesKey(pair.Index, "BT"), $"{pair.Name} BT", color, dashed: true);
+            // ? DashStyle.Dash : DashStyle.Solid
+            _seriesByKey[SeriesKey(pair.Index, "USB")] = new GraphSeries(SeriesKey(pair.Index, "USB"), $"{pair.Name} USB", color, dashed: System.Drawing.Drawing2D.DashStyle.Solid);
+            _seriesByKey[SeriesKey(pair.Index, "BT")] = new GraphSeries(SeriesKey(pair.Index, "BT"), $"{pair.Name} BT", color, dashed: System.Drawing.Drawing2D.DashStyle.Dash);
         }
+
+        _cardsPanel.Controls.Add(AverageCard);
+        _cardsPanel.Controls.Add(_binsPanel);
+
+        // Add average humidity series with secondary axis
+        _seriesByKey["AvgHumidity"] = new GraphSeries("AvgHumidity", "Average Humidity %", Color.Plum, dashed: System.Drawing.Drawing2D.DashStyle.DashDotDot, useSecondaryAxis: true);
+
+        // Add average humidity series with secondary axis
+        _seriesByKey["AvgDewPoint"] = new GraphSeries("AvgDewPoint", "Average Dew Point", Color.Lime, dashed: System.Drawing.Drawing2D.DashStyle.Dot, useSecondaryAxis: true);
 
         _graph.History = TimeSpan.FromMinutes(Math.Max(1, _config.GraphHistoryMinutes));
         _graph.SetSeries(_seriesByKey.Values);
@@ -303,6 +324,12 @@ internal sealed class MainForm : Form
         }
     }
 
+    private void ResetTemperatureBins()
+    {
+        _binsPanel.ResetBins();
+        SetStatus("Temperature bins reset");
+    }
+
     private void OpenConfigurationDialog()
     {
         var wasRunning = _running;
@@ -401,7 +428,35 @@ internal sealed class MainForm : Form
             ? null
             : HeatStressEvaluator.Calculate(usb.TemperatureC, bluetooth.HumidityPercent, _config);
 
-        card.UpdateDisplay(pair, bluetooth, btDeltas.Text, bluetoothHeat, usb, usbDeltas.Text, usbHeat, color);
+        card.UpdateDisplay(pair, bluetooth, btDeltas, bluetoothHeat, usb, usbDeltas, usbHeat, color);
+
+        // Compute averages independently and handle nulls
+        var bluetoothAvg = BluetoothReading.Average(_lastBluetooth);
+        var usbAvg = UsbReading.Average(_lastUsb);
+
+        HeatStressResult? avgHeat = null;
+        if (bluetoothAvg != null && usbAvg != null)
+        {
+            avgHeat = HeatStressEvaluator.Calculate(usbAvg.TemperatureC, bluetoothAvg.HumidityPercent, _config);
+        }
+
+        AverageCard.UpdateDisplay(bluetoothAvg, usbAvg, avgHeat);
+        if (usbAvg != null)
+        {
+            _binsPanel.UpdateBin(usbAvg.TemperatureC, DateTimeOffset.Now);
+        }
+
+        if (bluetoothAvg != null)
+        {
+            // Add average humidity to graph (always add, even if zero)
+            AddGraphPoint("AvgHumidity", bluetoothAvg.HumidityPercent, bluetoothAvg.Time, isHumidity: true);
+        }
+
+        if (bluetoothAvg != null)
+        {
+            // Add average dew point to graph (always add, even if zero)
+            AddGraphPoint("AvgDewPoint", bluetoothAvg.DewPointC, bluetoothAvg.Time, isHumidity: true); //not humidity, but we want to use the secondary axis
+        }
     }
 
     private void WriteCsv(int index, string source)
@@ -435,15 +490,13 @@ internal sealed class MainForm : Form
             source,
             bluetooth,
             usb,
-            btDeltas.Delta60,
-            btDeltas.Delta120,
+            btDeltas,
             bluetoothHeat,
-            usbDeltas.Delta60,
-            usbDeltas.Delta120,
+            usbDeltas,
             usbHeat);
     }
 
-    private void AddGraphPoint(string key, double temperatureC, DateTimeOffset time)
+    private void AddGraphPoint(string key, double temperatureC, DateTimeOffset time, bool isHumidity = false)
     {
         if (!_seriesByKey.TryGetValue(key, out var series))
         {
@@ -457,7 +510,14 @@ internal sealed class MainForm : Form
         }
 
         _lastGraphPointByKey[key] = time;
-        series.Points.Add(new GraphPoint(time, temperatureC));
+        if (isHumidity)
+        {
+            series.Points.Add(new GraphPoint(time, 0, HumidityPercent: (int)temperatureC));
+        }
+        else
+        {
+            series.Points.Add(new GraphPoint(time, temperatureC));
+        }
         PruneOldGraphData(series);
         _graph.Invalidate();
     }
@@ -468,27 +528,29 @@ internal sealed class MainForm : Form
         series.Points.RemoveAll(p => p.Time < cutoff);
     }
 
-    private static DeltaDisplay GetDeltaDisplay(TemperatureDeltaCalculator calculator, DateTimeOffset? now)
+    private static string GetDeltaDisplay(TemperatureDeltaCalculator calculator, DateTimeOffset? now)
     {
         if (now is null)
         {
-            return new DeltaDisplay(string.Empty, string.Empty, string.Empty);
+            return string.Empty;
         }
 
-        var delta60 = FormatDelta(calculator.GetDeltaSeconds(60, now));
-        var delta120 = FormatDelta(calculator.GetDeltaSeconds(120, now));
-        var textParts = new List<string>();
-        if (!string.IsNullOrEmpty(delta60))
-        {
-            textParts.Add($"d60:{delta60}C");
-        }
+        return FormatDelta(calculator.GetDeltaSeconds(60, now));
 
-        if (!string.IsNullOrEmpty(delta120))
-        {
-            textParts.Add($"d120:{delta120}C");
-        }
+        //var delta60 = FormatDelta(calculator.GetDeltaSeconds(60, now));
+        //var delta120 = FormatDelta(calculator.GetDeltaSeconds(120, now));
+        //var textParts = new List<string>();
+        //if (!string.IsNullOrEmpty(delta60))
+        //{
+        //    textParts.Add($"d60:{delta60}C");
+        //}
 
-        return new DeltaDisplay(delta60, delta120, string.Join(" ", textParts));
+        //if (!string.IsNullOrEmpty(delta120))
+        //{
+        //    textParts.Add($"d120:{delta120}C");
+        //}
+
+        //return new DeltaDisplay(delta60, delta120, string.Join(" ", textParts));
     }
 
     private static string FormatDelta(double? value)
@@ -538,6 +600,20 @@ internal sealed class MainForm : Form
         }
     }
 
+    private void InitializeComponent()
+    {
+        System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
+        SuspendLayout();
+        // 
+        // MainForm
+        // 
+        ClientSize = new Size(278, 244);
+        Icon = (Icon)resources.GetObject("$this.Icon");
+        Name = "MainForm";
+        ResumeLayout(false);
+
+    }
+
     private void RunOnUiThread(Action action)
     {
         if (IsDisposed)
@@ -554,5 +630,5 @@ internal sealed class MainForm : Form
         action();
     }
 
-    private readonly record struct DeltaDisplay(string Delta60, string Delta120, string Text);
+    //private readonly record struct DeltaDisplay(string Delta60, string Delta120, string Text);
 }
