@@ -38,7 +38,7 @@ internal sealed class TestDataService : IDisposable
             }
 
             _start = DateTimeOffset.Now;
-            _timer = new System.Threading.Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+            _timer = new System.Threading.Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
             IsRunning = true;
         }
 

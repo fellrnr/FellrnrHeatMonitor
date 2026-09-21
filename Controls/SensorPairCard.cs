@@ -20,10 +20,8 @@ internal sealed class SensorPairCard : Panel
     public SensorPairCard()
     {
         //Width = 550;
-        //Height = 255;
-        Width = 550;
-        Height = 305;
-        //AutoSize = true;
+        //Height = 305;
+        AutoSize = true;
         Margin = new Padding(8);
         Padding = new Padding(8);
         BorderStyle = BorderStyle.FixedSingle;
@@ -35,7 +33,8 @@ internal sealed class SensorPairCard : Panel
 
     public void SetPair(SensorPairConfig pair, Color color)
     {
-        _titleLabel.Text = pair.Name;
+        //force a fixed width indirectly
+        _titleLabel.Text = "<<<<<<<<<<<" + pair.Name + ">>>>>>>>>>>";
         _titleLabel.ForeColor = color;
         //_pairLabel.Text = $"USB channel {pair.UsbChannel} + BT {MacAddressHelper.FormatWithColons(pair.BluetoothMacAddress)}";
     }
@@ -50,6 +49,7 @@ internal sealed class SensorPairCard : Panel
         HeatStressResult? usbHeatStress,
         Color pairColor)
     {
+        SuspendLayout();
         SetPair(pair, pairColor);
 
         //_btTempLabel.Text = bluetooth is null
@@ -80,16 +80,57 @@ internal sealed class SensorPairCard : Panel
         SetHeatLabel(_usbHeatStressLabel, usbHeatStress,
             bluetooth is null ? "Waiting for Bluetooth humidity" : usb is null ? "Waiting for USB" : null);
 
-        var btTime = bluetooth?.Time.ToString("HH:mm:ss") ?? "--";
-        var usbTime = usb?.Time.ToString("HH:mm:ss") ?? "--";
-        var battery = bluetooth?.BatteryPercent is null ? string.Empty : $"  Battery {bluetooth.BatteryPercent}%";
-        var rssi = bluetooth is null ? string.Empty : $"  RSSI {bluetooth.Rssi}";
-        _lastSeenLabel.Text = $"Last BT {btTime}   Last USB {usbTime}{battery}{rssi}";
+        //var btTime = bluetooth?.Time.ToString("HH:mm:ss") ?? "--";
+        var btTime = GetHumanFriendlyTime(bluetooth?.Time);
+        //var usbTime = usb?.Time.ToString("HH:mm:ss") ?? "--";
+        var usbTime = GetHumanFriendlyTime(usb?.Time);
+        var battery = bluetooth?.BatteryPercent is null ? string.Empty : $" {bluetooth.BatteryPercent}%";
+        var rssi = bluetooth is null ? string.Empty : $" RSSI {bluetooth.Rssi}";
+        _lastSeenLabel.Text = $"BT {btTime}, {battery}, {rssi} USB {usbTime}";
+        if(bluetooth != null && bluetooth.BatteryPercent < 20)
+        {
+            _lastSeenLabel.ForeColor = Color.Red;
+        }
+        else
+        {
+            _lastSeenLabel.ForeColor = Color.White;
+        }
+        ResumeLayout();
+    }
+
+    public static string GetHumanFriendlyTime(DateTimeOffset? target)
+    {
+        if(target is null)
+        {
+            return "Never";
+        }
+        TimeSpan difference = target.Value - DateTimeOffset.Now;
+        bool isInPast = difference.Ticks < 0;
+
+        // Use the absolute value to check the duration magnitudes
+        TimeSpan absDiff = difference.Duration();
+
+        string timeText = absDiff.TotalSeconds switch
+        {
+            < 5 => "Just now",
+            < 60 => $"{(int)absDiff.TotalMinutes} minute{((int)absDiff.TotalMinutes == 1 ? "" : "s")}",
+            < 3600 => $"{(int)absDiff.TotalMinutes} minute{((int)absDiff.TotalMinutes == 1 ? "" : "s")}",
+            < 86400 => $"{(int)absDiff.TotalHours} hour{((int)absDiff.TotalHours == 1 ? "" : "s")}",
+            < 2592000 => $"{(int)absDiff.TotalDays} day{((int)absDiff.TotalDays == 1 ? "" : "s")}",
+            < 31536000 => $"{(int)(absDiff.TotalDays / 30)} month{((int)(absDiff.TotalDays / 30) == 1 ? "" : "s")}",
+            _ => $"{(int)(absDiff.TotalDays / 365)} year{((int)(absDiff.TotalDays / 365) == 1 ? "" : "s")}"
+        };
+
+        // If it's "Just now", we don't need to append "ago" or "In"
+        if (timeText == "Just now") return timeText;
+
+        return isInPast ? $"{timeText} ago" : $"In {timeText}";
     }
 
     public void UpdateDisplay(BluetoothReading? bluetooth, UsbReading? usb, HeatStressResult? usbHeatStress)
     {
-        _titleLabel.Text = "Average";
+        SuspendLayout();
+        _titleLabel.Text = "<<<<<<<<<<<Average>>>>>>>>>>>";
 
         _btHumidityLabel.Text = bluetooth is null ? "--" : $"{bluetooth.HumidityPercent}%";
         _btDewPointLabel.Text = bluetooth is null ? "--" : $"{bluetooth.DewPointC:F1} C";
@@ -111,6 +152,7 @@ internal sealed class SensorPairCard : Panel
         }
         SetHeatLabel(_usbHeatStressLabel, usbHeatStress,
             bluetooth is null ? "Waiting for Bluetooth humidity" : usb is null ? "Waiting for USB" : null);
+        ResumeLayout();
     }
 
 
@@ -142,7 +184,8 @@ internal sealed class SensorPairCard : Panel
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); //135
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        _titleLabel.Font = new Font(Font.FontFamily, 12.5f, FontStyle.Bold);
+        //_titleLabel.Font = new Font(Font.FontFamily, 12.5f, FontStyle.Bold);
+        _titleLabel.Font = new Font(Font.FontFamily, 10f, FontStyle.Bold);
         //_titleLabel.BackColor = Color.White;
         _titleLabel.AutoSize = true;
         //_titleLabel.AutoEllipsis = true;
@@ -161,10 +204,10 @@ internal sealed class SensorPairCard : Panel
         //layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         //AddRow(layout, 2, "Bluetooth temp", _btTempLabel, new Font(Font.FontFamily, 12.5f, FontStyle.Regular));
-        AddRow(layout, 1, "USB temp", _usbTempLabel, new Font(Font.FontFamily, 16f, FontStyle.Regular));
-        AddRow(layout, 2, "Feels Like", _usbHeatStressLabel, new Font(Font.FontFamily, 16f, FontStyle.Regular));
-        AddRow(layout, 3, "RH", _btHumidityLabel, new Font(Font.FontFamily, 12.5f, FontStyle.Regular));
-        AddRow(layout, 4, "Dew point", _btDewPointLabel, new Font(Font.FontFamily, 12.5f, FontStyle.Regular));
+        AddRow(layout, 1, "USB temp", _usbTempLabel, new Font(Font.FontFamily, 14f, FontStyle.Regular));
+        AddRow(layout, 2, "Feels Like", _usbHeatStressLabel, new Font(Font.FontFamily, 14f, FontStyle.Regular));
+        AddRow(layout, 3, "RH", _btHumidityLabel, new Font(Font.FontFamily, 12f, FontStyle.Regular));
+        AddRow(layout, 4, "Dew point", _btDewPointLabel, new Font(Font.FontFamily, 12f, FontStyle.Regular));
         //AddRow(layout, 5, "Bluetooth heat stress", _btHeatStressLabel, new Font(Font.FontFamily, 12.5f, FontStyle.Regular));
 
         _lastSeenLabel.Dock = DockStyle.Fill;

@@ -46,6 +46,7 @@ internal sealed class MainForm : Form
     {
         Text = "Fellrnr Heat Monitor";
         InitializeComponent();
+        DoubleBuffered = true;
         //Icon = Properties.Resources.HeatMonitorIcon;
         //Width = 1540;
         //Height = 900;
@@ -93,10 +94,12 @@ internal sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4
+            RowCount = 4,
+            AutoSize = true,
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 335)); //285
+        //root.RowStyles.Add(new RowStyle(SizeType.Absolute, 335)); //285
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); //285
         //root.RowStyles.Add(new RowStyle(SizeType.Absolute, 280));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
@@ -135,13 +138,13 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(_modeLabel);
         toolbar.Controls.Add(_statusLabel);
 
-        _cardsPanel.Dock = DockStyle.Fill;
-        _cardsPanel.AutoScroll = true;
+        //_cardsPanel.Dock = DockStyle.Fill;
+        //_cardsPanel.AutoScroll = true;
         _cardsPanel.FlowDirection = FlowDirection.LeftToRight;
         _cardsPanel.WrapContents = false;
         _cardsPanel.Padding = new Padding(8);
         _cardsPanel.BackColor = SystemColors.Control;
-
+        _cardsPanel.AutoSize = true;
         //_binsPanel.Dock = DockStyle.Fill;
         //_binsPanel.Margin = new Padding(8);
 
@@ -356,6 +359,7 @@ internal sealed class MainForm : Form
             return;
         }
 
+        SuspendLayout();
         var index = reading.SensorIndex;
         var zero = index - 1;
         _lastBluetooth[zero] = reading;
@@ -364,6 +368,7 @@ internal sealed class MainForm : Form
         UpdateCard(index);
         WriteCsv(index, "Bluetooth");
         SetStatus($"Bluetooth {reading.SensorName}: {reading.TemperatureC:F1} C, {reading.HumidityPercent}% RH, dew point {reading.DewPointC:F1} C");
+        ResumeLayout();
     }
 
     private void ApplyUsbTemperatures(UsbTemperaturesReceivedEventArgs e)
@@ -391,12 +396,14 @@ internal sealed class MainForm : Form
                 TemperatureC = temp
             };
 
+            SuspendLayout();
             var zero = pair.Index - 1;
             _lastUsb[zero] = reading;
             _usbDeltas[zero].AddReading(temp, e.Time);
             AddGraphPoint(SeriesKey(pair.Index, "USB"), temp, e.Time);
             UpdateCard(pair.Index);
             WriteCsv(pair.Index, "USB");
+            ResumeLayout();
         }
 
         SetStatus($"USB update from {e.SourcePort}: {string.Join(", ", e.TemperaturesC.Select(t => IsValidUsbTemperature(t) ? t.ToString("F1", CultureInfo.CurrentCulture) + " C" : "invalid"))}");

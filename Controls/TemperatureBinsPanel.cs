@@ -7,13 +7,14 @@ namespace FellrnrHeatMonitor.Controls;
 internal sealed class TemperatureBinsPanel : Panel
 {
     private readonly TemperatureBinsModel _model = new();
-    private readonly FlowLayoutPanel _binsContainer = new();
+    //private readonly FlowLayoutPanel _binsContainer = new();
+    private readonly TableLayoutPanel _binsContainer = new();
 
     public TemperatureBinsPanel()
     {
-        Width = 550;
+        //Width = 550;
         //Height = 255;
-        Height = 305;
+        AutoSize = true;
         Margin = new Padding(8);
         Padding = new Padding(8);
         BorderStyle = BorderStyle.FixedSingle;
@@ -28,7 +29,7 @@ internal sealed class TemperatureBinsPanel : Panel
     {
         var titleLabel = new Label
         {
-            Text = "Temperature Bins (Cumulative Time)",
+            Text = "Time in °C",
             AutoSize = true,
             //Width = 500,
             //Height = 24,
@@ -38,10 +39,12 @@ internal sealed class TemperatureBinsPanel : Panel
             //Margin = new Padding(0, 0, 0, 8)
         };
 
-        _binsContainer.Dock = DockStyle.Fill;
-        _binsContainer.FlowDirection = FlowDirection.TopDown;
-        _binsContainer.AutoScroll = true;
-        _binsContainer.WrapContents = false;
+        _binsContainer.AutoSize = true;
+
+        //_binsContainer.Dock = DockStyle.Fill;
+        //_binsContainer.FlowDirection = FlowDirection.TopDown;
+        //_binsContainer.AutoScroll = true;
+        //_binsContainer.WrapContents = false;
         _binsContainer.BackColor = Color.Black;
         _binsContainer.Padding = new Padding(0);
         _binsContainer.Margin = new Padding(0);
@@ -52,8 +55,10 @@ internal sealed class TemperatureBinsPanel : Panel
         _binsContainer.Controls.Add(titleLabel);
 
 
+        int i = 0;
         foreach (var bin in _model.Bins)
         {
+            int column = i++ < 5 ? 0 : 1;
             var binLabel = new Label
             {
                 Text = $"{bin.Label}: {FormatTimeSpan(bin.CumulativeTime)}",
@@ -61,11 +66,11 @@ internal sealed class TemperatureBinsPanel : Panel
                 ForeColor = Color.White,
                 BackColor = Color.Black,
                 Margin = new Padding(0, 2, 0, 2),
-                Font = new Font(Font.FontFamily, Font.Size),
-                Tag = bin
+                Font = new Font(Font.FontFamily, Font.Size+4),
+                Tag = bin,
             };
 
-            _binsContainer.Controls.Add(binLabel);
+            _binsContainer.Controls.Add(binLabel, column, column == 0 ? i : i - 5);
         }
     }
 

@@ -24,7 +24,8 @@ internal sealed class TemperatureBinsModel
         _bins.Add(new TemperatureBin("46-48°C", 46.0, 48.0));
         _bins.Add(new TemperatureBin("48-50°C", 48.0, 50.0));
         _bins.Add(new TemperatureBin("50-52°C", 50.0, 52.0));
-        _bins.Add(new TemperatureBin("Over 52°C", 52.0, null));
+        _bins.Add(new TemperatureBin("52-54°C", 52.0, 54.0));
+        _bins.Add(new TemperatureBin("Over 54°C", 54.0, null));
     }
 
     public void Update(double temperature, DateTimeOffset now)

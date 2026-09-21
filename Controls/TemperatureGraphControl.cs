@@ -43,15 +43,16 @@ internal sealed class TemperatureGraphControl : Control
         using var textBrush = new SolidBrush(ForeColor);
         using var labelBrush = new SolidBrush(Color.DimGray);
 
+        var minY = 15.0;
+        var maxY = 45.0;
+
         var now = DateTimeOffset.Now;
         var historySeconds = Math.Max(60.0, History.TotalSeconds);
         var cutoff = now.AddSeconds(-historySeconds);
         var pointsInWindow = _series
-            .SelectMany(s => s.Points.Where(p => p.Time >= cutoff && p.Time <= now.AddSeconds(10)))
+            .SelectMany(s => s.Points.Where(p => p.Time >= cutoff && p.Time <= now.AddSeconds(10) && p.TemperatureC > minY))
             .ToList();
 
-        var minY = 20.0;
-        var maxY = 45.0;
         if (pointsInWindow.Count > 0)
         {
             minY = Math.Min(minY, Math.Floor(pointsInWindow.Min(p => p.TemperatureC) - 2));
@@ -120,7 +121,7 @@ internal sealed class TemperatureGraphControl : Control
                 continue;
             }
 
-            using var pen = new Pen(series.Color, 4.0f)
+            using var pen = new Pen(series.Color, 2.0f) //thickness of the line
             {
                 DashStyle = series.Dashed
             };

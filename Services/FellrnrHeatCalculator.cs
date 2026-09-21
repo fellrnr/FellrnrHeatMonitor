@@ -102,26 +102,27 @@ public sealed class FellrnrHeatCalculator
                         (excessHeatLostViaSweat > 0 && nextPercentMaxSweat > runningPercentMaxSweat && runningPercentMaxSweat > lastPercentMaxSweat);
             if (found)
             {
-                string retval;
+                string temp;
+                string sweat;
                 if (tempUnits == "Centigrade")
                 {
-                    retval = $"{Math.Round(nextGuess, 1)}c";
+                    temp = $"{Math.Round(nextGuess, 1)}c";
                 }
                 else
                 {
-                    retval = $"{Math.Round(C2F(nextGuess), 1)}f {Math.Round(nextGuess, 1)}c";
+                    temp = $"{Math.Round(C2F(nextGuess), 1)}f {Math.Round(nextGuess, 1)}c";
                 }
 
                 if (excessHeatLostViaSweat > 0)
                 {
-                    retval += $" ({Math.Round(runningPercentMaxSweat, 0)}% max)";
+                    sweat = $" ({Math.Round(runningPercentMaxSweat, 0)}% max)";
                 }
                 else
                 {
-                    retval += $" ({Math.Round(-excessHeatLostViaSweat, 0)}w lost)";
+                    sweat = $" ({Math.Round(-excessHeatLostViaSweat, 0)}w lost)";
                 }
 
-                retval += SodiumMessage;
+                sweat += SodiumMessage;
 
                 int red;
                 int green;
@@ -143,7 +144,7 @@ public sealed class FellrnrHeatCalculator
                 green = Math.Clamp(green, 0, 255);
                 blue = Math.Clamp(blue, 0, 255);
                 TempColor = $"#{red:X2}{green:X2}{blue:X2}";
-                ResultMessage = retval;
+                ResultMessage = temp; // + sweat;
                 FeelsLikeTemp = nextGuess;
                 return;
             }
