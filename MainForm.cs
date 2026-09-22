@@ -20,6 +20,7 @@ internal sealed class MainForm : Form
 
     private readonly FlowLayoutPanel _cardsPanel = new();
     private readonly TemperatureGraphControl _graph = new();
+    private readonly TemperatureRadarControl _radar = new();
     private readonly TemperatureBinsPanel _binsPanel = new();
     private readonly Label _statusLabel = new();
     private readonly Label _modeLabel = new();
@@ -151,10 +152,28 @@ internal sealed class MainForm : Form
         _graph.Dock = DockStyle.Fill;
         _graph.Margin = new Padding(8);
 
+        _radar.Dock = DockStyle.Fill;
+        _radar.Margin = new Padding(8);
+
+        // Create a container for graph and radar side-by-side
+        var graphRadarContainer = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            AutoSize = false
+        };
+        graphRadarContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        graphRadarContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        graphRadarContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        graphRadarContainer.Controls.Add(_graph, 0, 0);
+        graphRadarContainer.Controls.Add(_radar, 1, 0);
+
         root.Controls.Add(toolbar, 0, 0);
         root.Controls.Add(_cardsPanel, 0, 1);
         //root.Controls.Add(_binsPanel, 0, 2);
-        root.Controls.Add(_graph, 0, 2);
+        root.Controls.Add(graphRadarContainer, 0, 2);
         Controls.Add(root);
     }
 
@@ -219,6 +238,7 @@ internal sealed class MainForm : Form
 
         _graph.History = TimeSpan.FromMinutes(Math.Max(1, _config.GraphHistoryMinutes));
         _graph.SetSeries(_seriesByKey.Values);
+        _radar.SetBins(_binsPanel.Model.Bins);
         UpdateModeLabel();
         SetStatus($"Configured {_cardsByIndex.Count} sensor pair(s). CSV: {_configService.CsvPath}");
     }
@@ -330,6 +350,7 @@ internal sealed class MainForm : Form
     private void ResetTemperatureBins()
     {
         _binsPanel.ResetBins();
+        _radar.SetBins(_binsPanel.Model.Bins);
         SetStatus("Temperature bins reset");
     }
 
@@ -451,6 +472,7 @@ internal sealed class MainForm : Form
         if (usbAvg != null)
         {
             _binsPanel.UpdateBin(usbAvg.TemperatureC, DateTimeOffset.Now);
+            _radar.SetBins(_binsPanel.Model.Bins);
         }
 
         if (bluetoothAvg != null)

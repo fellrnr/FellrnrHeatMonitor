@@ -87,7 +87,7 @@ internal sealed class TestDataService : IDisposable
             }
 
             var idx = pair.Index - 1;
-            var baseTemp = 25.0 + idx * 2.0 + 4.0 * Math.Sin(seconds / 120.0 + idx * 0.7);
+            var baseTemp = 35.0 + idx * 2.0 + 4.0 * Math.Sin(seconds / 120.0 + idx * 0.7);
             var humidity = (int)Math.Round(Math.Clamp(50.0 + 18.0 * Math.Sin(seconds / 170.0 + idx) + Noise(2.0), 18.0, 90.0));
             var bluetoothTemp = baseTemp + Noise(0.25);
             var usbTemp = baseTemp + 3.5 + idx * 0.8 + 2.0 * Math.Sin(seconds / 80.0 + idx * 1.3) + Noise(0.35);

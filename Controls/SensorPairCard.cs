@@ -34,7 +34,7 @@ internal sealed class SensorPairCard : Panel
     public void SetPair(SensorPairConfig pair, Color color)
     {
         //force a fixed width indirectly
-        _titleLabel.Text = "<<<<<<<<<<<" + pair.Name + ">>>>>>>>>>>";
+        _titleLabel.Text = "<<<<<<<<<<<<<<<" + pair.Name + ">>>>>>>>>>>>>>>";
         _titleLabel.ForeColor = color;
         //_pairLabel.Text = $"USB channel {pair.UsbChannel} + BT {MacAddressHelper.FormatWithColons(pair.BluetoothMacAddress)}";
     }
@@ -130,7 +130,7 @@ internal sealed class SensorPairCard : Panel
     public void UpdateDisplay(BluetoothReading? bluetooth, UsbReading? usb, HeatStressResult? usbHeatStress)
     {
         SuspendLayout();
-        _titleLabel.Text = "<<<<<<<<<<<Average>>>>>>>>>>>";
+        _titleLabel.Text = "<<<<<<<<<<<<<<<Average>>>>>>>>>>>>>>>";
 
         _btHumidityLabel.Text = bluetooth is null ? "--" : $"{bluetooth.HumidityPercent}%";
         _btDewPointLabel.Text = bluetooth is null ? "--" : $"{bluetooth.DewPointC:F1} C";
@@ -204,7 +204,7 @@ internal sealed class SensorPairCard : Panel
         //layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         //AddRow(layout, 2, "Bluetooth temp", _btTempLabel, new Font(Font.FontFamily, 12.5f, FontStyle.Regular));
-        AddRow(layout, 1, "USB temp", _usbTempLabel, new Font(Font.FontFamily, 14f, FontStyle.Regular));
+        AddRow(layout, 1, "USB temp", _usbTempLabel, new Font(Font.FontFamily, 18f, FontStyle.Regular));
         AddRow(layout, 2, "Feels Like", _usbHeatStressLabel, new Font(Font.FontFamily, 14f, FontStyle.Regular));
         AddRow(layout, 3, "RH", _btHumidityLabel, new Font(Font.FontFamily, 12f, FontStyle.Regular));
         AddRow(layout, 4, "Dew point", _btDewPointLabel, new Font(Font.FontFamily, 12f, FontStyle.Regular));
