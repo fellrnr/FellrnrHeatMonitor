@@ -8,18 +8,20 @@ namespace FellrnrHeatMonitor.Controls;
 
 internal sealed class TemperatureRadarControl : Control
 {
-    private IReadOnlyList<TemperatureBin> _bins = Array.Empty<TemperatureBin>();
+    private IReadOnlyList<Bin> _bins = Array.Empty<Bin>();
     private const int MaxRadarLevels = 5;
 
-    public TemperatureRadarControl()
+    private string name;
+    public TemperatureRadarControl(string name)
     {
         DoubleBuffered = true;
         BackColor = Color.Black;
         ForeColor = Color.White;
+        this.name = name;
     }
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public void SetBins(IEnumerable<TemperatureBin> bins)
+    public void SetBins(IEnumerable<Bin> bins)
     {
         _bins = bins.ToList();
         Invalidate();
@@ -146,7 +148,7 @@ internal sealed class TemperatureRadarControl : Control
     private void DrawTitle(Graphics g, Brush textBrush)
     {
         using var titleFont = new Font(Font.FontFamily, Font.Size + 2, FontStyle.Bold);
-        g.DrawString("Temperature Distribution", titleFont, textBrush, 10, 10);
+        g.DrawString(name, titleFont, textBrush, 10, 10);
     }
 
     private static string FormatTimeLabel(double minutes)

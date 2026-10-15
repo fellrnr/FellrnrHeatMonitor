@@ -20,8 +20,7 @@ internal sealed class MainForm : Form
 
     private readonly FlowLayoutPanel _cardsPanel = new();
     private readonly TemperatureGraphControl _graph = new();
-    private readonly TemperatureRadarControl _radar = new();
-    private readonly TemperatureBinsPanel _binsPanel = new();
+    private readonly TemperatureRadarControl[] _radarControls = new TemperatureRadarControl[6];
     private readonly Label _statusLabel = new();
     private readonly Label _modeLabel = new();
     private readonly Button _startButton = new();
@@ -29,6 +28,9 @@ internal sealed class MainForm : Form
     private readonly Button _clearButton = new();
     private readonly Button _resetBinsButton = new();
     private readonly Button _configButton = new();
+
+    private readonly BinsPanel[] _binsPanels = new BinsPanel[6];
+    private readonly BinsModel[] _binsModels = new BinsModel[6];
 
     private readonly Dictionary<int, SensorPairCard> _cardsByIndex = new();
     private readonly Dictionary<string, GraphSeries> _seriesByKey = new(StringComparer.OrdinalIgnoreCase);
@@ -95,13 +97,11 @@ internal sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
+            RowCount = 3,
             AutoSize = true,
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
-        //root.RowStyles.Add(new RowStyle(SizeType.Absolute, 335)); //285
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); //285
-        //root.RowStyles.Add(new RowStyle(SizeType.Absolute, 280));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var toolbar = new FlowLayoutPanel
@@ -139,41 +139,64 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(_modeLabel);
         toolbar.Controls.Add(_statusLabel);
 
-        //_cardsPanel.Dock = DockStyle.Fill;
-        //_cardsPanel.AutoScroll = true;
         _cardsPanel.FlowDirection = FlowDirection.LeftToRight;
         _cardsPanel.WrapContents = false;
         _cardsPanel.Padding = new Padding(8);
         _cardsPanel.BackColor = SystemColors.Control;
         _cardsPanel.AutoSize = true;
-        //_binsPanel.Dock = DockStyle.Fill;
-        //_binsPanel.Margin = new Padding(8);
 
         _graph.Dock = DockStyle.Fill;
         _graph.Margin = new Padding(8);
 
-        _radar.Dock = DockStyle.Fill;
-        _radar.Margin = new Padding(8);
-
-        // Create a container for graph and radar side-by-side
-        var graphRadarContainer = new TableLayoutPanel
+        // Create 3-column layout: Graph | BinsPanels | RadarControls
+        var mainContainer = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
+            ColumnCount = 3,
             RowCount = 1,
             AutoSize = false
         };
-        graphRadarContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        graphRadarContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        graphRadarContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        mainContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50.0f));
+        mainContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20.0f));
+        mainContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30.0f));
+        mainContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        graphRadarContainer.Controls.Add(_graph, 0, 0);
-        graphRadarContainer.Controls.Add(_radar, 1, 0);
+        // Column 1: Main Graph
+        mainContainer.Controls.Add(_graph, 0, 0);
+
+        // Column 2: BinsPanels (2x3 grid)
+        var binsPanelsContainer = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 3,
+            AutoSize = false
+        };
+        binsPanelsContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        binsPanelsContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        binsPanelsContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+        binsPanelsContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+        binsPanelsContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+        mainContainer.Controls.Add(binsPanelsContainer, 1, 0);
+
+        // Column 3: RadarControls (2x3 grid)
+        var radarContainer = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 3,
+            AutoSize = false
+        };
+        radarContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        radarContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        radarContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+        radarContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+        radarContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+        mainContainer.Controls.Add(radarContainer, 2, 0);
 
         root.Controls.Add(toolbar, 0, 0);
         root.Controls.Add(_cardsPanel, 0, 1);
-        //root.Controls.Add(_binsPanel, 0, 2);
-        root.Controls.Add(graphRadarContainer, 0, 2);
+        root.Controls.Add(mainContainer, 0, 2);
         Controls.Add(root);
     }
 
@@ -209,9 +232,44 @@ internal sealed class MainForm : Form
         _bluetoothDeltas = CreateDeltaCalculators();
         _usbDeltas = CreateDeltaCalculators();
 
+        // Initialize bins models and panels
+        var tempBoundaries = new[] { 38.0, 40.0, 42.0, 44.0, 46.0, 48.0, 50.0, 52.0, 54.0 };
+        var humidityBoundaries = new[] { 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0 };
+
+        _binsModels[0] = new BinsModel("°C", tempBoundaries);
+        _binsPanels[0] = new BinsPanel(_binsModels[0], "Avg Temperature");
+        _radarControls[0] = new TemperatureRadarControl("Average");
+        _radarControls[0].Dock = DockStyle.Fill;
+        _radarControls[0].Margin = new Padding(4);
+        _radarControls[0].SetBins(_binsModels[0].Bins);
+
+        _binsModels[1] = new BinsModel("%", humidityBoundaries);
+        _binsPanels[1] = new BinsPanel(_binsModels[1], "Avg Humidity");
+        _radarControls[1] = new TemperatureRadarControl("Humidity");
+        _radarControls[1].Dock = DockStyle.Fill;
+        _radarControls[1].Margin = new Padding(4);
+        _radarControls[1].SetBins(_binsModels[1].Bins);
+
+        // Find layout containers
+        var root = (TableLayoutPanel)Controls[0];
+        var mainContainer = (TableLayoutPanel)root.Controls[2];
+        var binsPanelsContainer = (TableLayoutPanel)mainContainer.Controls[1];
+        var radarContainer = (TableLayoutPanel)mainContainer.Controls[2];
+
+        binsPanelsContainer.Controls.Clear();
+        radarContainer.Controls.Clear();
+
+        binsPanelsContainer.Controls.Add(_binsPanels[0], 0, 0);
+        binsPanelsContainer.Controls.Add(_binsPanels[1], 1, 0);
+        radarContainer.Controls.Add(_radarControls[0], 0, 0);
+        radarContainer.Controls.Add(_radarControls[1], 1, 0);
+
+        int sensorIndex = 2;
+        int col = 0, row = 1;
+
         foreach (var pair in _config.SensorPairs.OrderBy(p => p.Index))
         {
-            if (!pair.Enabled)
+            if (!pair.Enabled || sensorIndex >= 6)
             {
                 continue;
             }
@@ -222,26 +280,44 @@ internal sealed class MainForm : Form
             _cardsByIndex[pair.Index] = card;
             _cardsPanel.Controls.Add(card);
 
-            // ? DashStyle.Dash : DashStyle.Solid
+            // Create temperature bins panel and radar for this sensor
+            _binsModels[sensorIndex] = new BinsModel("°C", tempBoundaries);
+            _binsPanels[sensorIndex] = new BinsPanel(_binsModels[sensorIndex], $"{pair.Name}");
+            binsPanelsContainer.Controls.Add(_binsPanels[sensorIndex], col, row);
+
+            _radarControls[sensorIndex] = new TemperatureRadarControl($"{pair.Name}");
+            _radarControls[sensorIndex].Dock = DockStyle.Fill;
+            _radarControls[sensorIndex].Margin = new Padding(4);
+            _radarControls[sensorIndex].SetBins(_binsModels[sensorIndex].Bins);
+            radarContainer.Controls.Add(_radarControls[sensorIndex], col, row);
+
+            sensorIndex++;
+            col++;
+            if (col >= 2)
+            {
+                col = 0;
+                row++;
+            }
+
+            // Add graph series for this sensor
             _seriesByKey[SeriesKey(pair.Index, "USB")] = new GraphSeries(SeriesKey(pair.Index, "USB"), $"{pair.Name} USB", color, dashed: System.Drawing.Drawing2D.DashStyle.Solid);
             _seriesByKey[SeriesKey(pair.Index, "BT")] = new GraphSeries(SeriesKey(pair.Index, "BT"), $"{pair.Name} BT", color, dashed: System.Drawing.Drawing2D.DashStyle.Dash);
         }
 
         _cardsPanel.Controls.Add(AverageCard);
-        _cardsPanel.Controls.Add(_binsPanel);
 
         // Add average humidity series with secondary axis
         _seriesByKey["AvgHumidity"] = new GraphSeries("AvgHumidity", "Average Humidity %", Color.Plum, dashed: System.Drawing.Drawing2D.DashStyle.DashDotDot, useSecondaryAxis: true);
 
-        // Add average humidity series with secondary axis
+        // Add average dew point series with secondary axis
         _seriesByKey["AvgDewPoint"] = new GraphSeries("AvgDewPoint", "Average Dew Point", Color.Lime, dashed: System.Drawing.Drawing2D.DashStyle.Dot, useSecondaryAxis: true);
 
         _graph.History = TimeSpan.FromMinutes(Math.Max(1, _config.GraphHistoryMinutes));
         _graph.SetSeries(_seriesByKey.Values);
-        _radar.SetBins(_binsPanel.Model.Bins);
         UpdateModeLabel();
         SetStatus($"Configured {_cardsByIndex.Count} sensor pair(s). CSV: {_configService.CsvPath}");
     }
+
 
     private void StartMonitoring()
     {
@@ -349,8 +425,17 @@ internal sealed class MainForm : Form
 
     private void ResetTemperatureBins()
     {
-        _binsPanel.ResetBins();
-        _radar.SetBins(_binsPanel.Model.Bins);
+        for (int i = 0; i < 6; i++)
+        {
+            if (_binsPanels[i] != null)
+            {
+                _binsPanels[i].ResetBins();
+            }
+            if (_radarControls[i] != null && _binsModels[i] != null)
+            {
+                _radarControls[i].SetBins(_binsModels[i].Bins);
+            }
+        }
         SetStatus("Temperature bins reset");
     }
 
@@ -469,10 +554,39 @@ internal sealed class MainForm : Form
         }
 
         AverageCard.UpdateDisplay(bluetoothAvg, usbAvg, avgHeat);
-        if (usbAvg != null)
+
+        // Update average temperature bins and radar
+        if (usbAvg != null && _binsPanels[0] != null)
         {
-            _binsPanel.UpdateBin(usbAvg.TemperatureC, DateTimeOffset.Now);
-            _radar.SetBins(_binsPanel.Model.Bins);
+            _binsPanels[0].UpdateBin(usbAvg.TemperatureC, DateTimeOffset.Now);
+            if (_radarControls[0] != null)
+            {
+                _radarControls[0].SetBins(_binsModels[0].Bins);
+            }
+        }
+
+        // Update average humidity bins and radar
+        if (bluetoothAvg != null && _binsPanels[1] != null)
+        {
+            _binsPanels[1].UpdateBin(bluetoothAvg.HumidityPercent, DateTimeOffset.Now);
+            if (_radarControls[1] != null)
+            {
+                _radarControls[1].SetBins(_binsModels[1].Bins);
+            }
+        }
+
+        // Update sensor-specific temperature bins and radars
+        for (int i = 0; i < 4; i++)
+        {
+            var sensorUsb = _lastUsb[i];
+            if (sensorUsb != null && _binsPanels[2 + i] != null)
+            {
+                _binsPanels[2 + i].UpdateBin(sensorUsb.TemperatureC, DateTimeOffset.Now);
+                if (_radarControls[2 + i] != null)
+                {
+                    _radarControls[2 + i].SetBins(_binsModels[2 + i].Bins);
+                }
+            }
         }
 
         if (bluetoothAvg != null)
