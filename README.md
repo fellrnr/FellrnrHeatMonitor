@@ -19,13 +19,15 @@ A combined C# WinForms application that merges the SwitchBot Bluetooth meter mon
 - Includes a single Configuration dialog for USB, Bluetooth, graph, heat-stress, and pairing settings.
 - Includes Test mode, enabled by default, that generates both USB and Bluetooth readings when hardware is not available.
 - Writes a combined CSV file to `%LOCALAPPDATA%\FellrnrHeatMonitor\heat_monitor_readings.csv`.
+- Runs a lightweight REST server on all interfaces at port `5080`.
+- Includes a separate WinForms client for viewing the REST reading from another PC.
 
 ## Build and run
 
 Requirements:
 
 - Windows 10 version 2004 or later, or Windows 11.
-- .NET 8 SDK or Visual Studio 2022 with the .NET desktop workload.
+ - .NET 10 SDK or Visual Studio 2026 with the .NET desktop workload.
 - Bluetooth LE adapter for real SwitchBot readings.
 - CD50 / Landtek 4-channel USB thermometer for real USB readings.
 
@@ -38,6 +40,26 @@ dotnet run --project .\FellrnrHeatMonitor.csproj
 ```
 
 Or open `FellrnrHeatMonitor.sln` in Visual Studio and press F5.
+
+## REST server and client
+
+When the monitor starts, it serves the current average-card values at:
+
+```text
+GET http://<monitor-pc>:5080/api/reading
+```
+
+The JSON response contains `averageTemperatureC`, `averageHumidityPercent`, and
+`lastReadingTime`. The temperature is the average of the current USB readings,
+the humidity is the average of the current Bluetooth readings, and the time is
+the most recent timestamp contributing to either value. Values are `null` until
+the corresponding readings are available.
+
+Build and run `FellrnrHeatMonitorClient\FellrnrHeatMonitorClient.csproj` on the
+client PC. Enter the monitor PC's IP address and click **Refresh**; the address
+is saved under `%LOCALAPPDATA%\FellrnrHeatMonitorClient\config.json` and is
+polled every five seconds thereafter. Windows Firewall may need an inbound TCP
+rule for port 5080, and the monitor must be allowed to listen on that port.
 
 ## Configuration
 

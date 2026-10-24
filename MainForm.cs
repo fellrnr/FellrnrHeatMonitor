@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Globalization;
+using System.Net;
 using System.Windows.Forms;
 using FellrnrHeatMonitor.Bluetooth;
 using FellrnrHeatMonitor.Controls;
@@ -17,6 +18,8 @@ internal sealed class MainForm : Form
     private readonly UsbThermometerReader _usbReader = new();
     private readonly TestDataService _testData = new();
     private readonly CsvLogger _csvLogger = new();
+    private readonly ReadingHttpServer _readingHttpServer;
+    private readonly object _readingSnapshotLock = new();
 
     private readonly FlowLayoutPanel _cardsPanel = new();
     private readonly TemperatureGraphControl _graph = new();
@@ -42,12 +45,14 @@ internal sealed class MainForm : Form
     private TemperatureDeltaCalculator[] _usbDeltas = CreateDeltaCalculators();
 
     private AppConfig _config = new();
+    private RestReadingSnapshot _latestRestSnapshot = new();
     private bool _running;
     private bool _runningInTestMode;
 
     public MainForm()
     {
         Text = "Fellrnr Heat Monitor";
+        _readingHttpServer = new(BuildRestSnapshot);
         InitializeComponent();
         DoubleBuffered = true;
         //Icon = Properties.Resources.HeatMonitorIcon;
@@ -63,6 +68,15 @@ internal sealed class MainForm : Form
         WireEvents();
         RebuildFromConfiguration();
         UpdateButtonState();
+        try
+        {
+            _readingHttpServer.Start();
+            SetStatus("REST server listening on port 5080");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"REST server could not start: {ex.Message}");
+        }
     }
 
     protected override void OnShown(EventArgs e)
@@ -81,6 +95,7 @@ internal sealed class MainForm : Form
         _usbReader.Dispose();
         _testData.Dispose();
         _csvLogger.Dispose();
+        _readingHttpServer.Dispose();
         base.OnFormClosing(e);
     }
 
@@ -587,6 +602,7 @@ internal sealed class MainForm : Form
                     _radarControls[2 + i].SetBins(_binsModels[2 + i].Bins);
                 }
             }
+
         }
 
         if (bluetoothAvg != null)
@@ -599,6 +615,20 @@ internal sealed class MainForm : Form
         {
             // Add average dew point to graph (always add, even if zero)
             AddGraphPoint("AvgDewPoint", bluetoothAvg.DewPointC, bluetoothAvg.Time, isHumidity: true); //not humidity, but we want to use the secondary axis
+        }
+
+        var readingTimes = new[] { bluetoothAvg?.Time, usbAvg?.Time }
+            .Where(time => time.HasValue)
+            .Select(time => time!.Value)
+            .ToArray();
+        lock (_readingSnapshotLock)
+        {
+            _latestRestSnapshot = new RestReadingSnapshot
+            {
+                AverageTemperatureC = usbAvg?.TemperatureC,
+                AverageHumidityPercent = bluetoothAvg?.HumidityPercent,
+                LastReadingTime = readingTimes.Length == 0 ? null : readingTimes.Max()
+            };
         }
     }
 
@@ -637,6 +667,14 @@ internal sealed class MainForm : Form
             bluetoothHeat,
             usbDeltas,
             usbHeat);
+    }
+
+    private RestReadingSnapshot BuildRestSnapshot()
+    {
+        lock (_readingSnapshotLock)
+        {
+            return _latestRestSnapshot;
+        }
     }
 
     private void AddGraphPoint(string key, double temperatureC, DateTimeOffset time, bool isHumidity = false)
